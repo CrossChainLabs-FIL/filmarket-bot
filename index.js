@@ -1,16 +1,39 @@
 const config = require('./config');
 const { INFO, ERROR, WARNING } = require('./logs');
 const { FormatSize, TimeDeltaH } = require('./utils');
-const { GetLocation } = require('./maxmind');
 const { Lotus } = require("./lotus");
 const { MinersClient } = require("./miners-client");
+const { ISOCodeToRegion } = require("./location");
 const CoinMarketCap = require('coinmarketcap-api')
 
-let stop= false;
-let minersClient = new MinersClient(config.bot.miners_api);
+const coinMarketCap = new CoinMarketCap(config.bot.coinmarketcap_apikey);
+
+let stop = false;
 let lotus = new Lotus(config.bot.lotus_api);
 let locationMap = new Map();
-const coinMarketCap = new CoinMarketCap(config.bot.coinmarketcap_apikey);
+let minersSet = new Set();
+
+
+async function RefreshMinersList() {
+    let minersClient_FG = new MinersClient(config.bot.miners_api_fg);
+    let minersClient_RS = new MinersClient(config.bot.miners_api_rs);
+
+    const miners_fg = await minersClient_FG.GetMiners();
+
+    for (const m_fg of miners_fg) {
+        minersSet.add(m_fg.miner);
+    }
+
+    const miners_rs = await minersClient_RS.GetMiners();
+
+    for (const m_rs of miners_rs) {
+        if (m_rs.isoCode) {
+            locationMap.set(m_rs.address, m_rs.isoCode);
+        }
+        
+        minersSet.add(m_rs.address);
+    }
+}
 
 async function GetFILPrice() {
     let price = undefined;
@@ -30,112 +53,73 @@ async function GetFILPrice() {
     return price;
 }
 
-async function GetMinerLocation(miner, addrs) {
-    if (addrs) {
-        let isoCode = undefined;
-        let city = undefined;
-
-        for (let rawAddr of addrs) {
-            let addr = rawAddr.substr(5);
-            let pos = addr.indexOf('/');
-            const response = await GetLocation(addr.substr(0, pos)).catch(() => undefined);
-            isoCode = response?.country?.isoCode;
-            city = response?.city?.names.en;
-
-            if (isoCode) {
-                break;
-            }
-        };
-
-        if (!isoCode) {
-            ERROR(`GetMinerLocation isoCode undefined for ${addrs}`);
-            return undefined;
-        }
-
-        INFO(`ActiveMiners::getMinerLocation ${miner} -> ${isoCode},${city}`);
-        return {
-            isoCode: isoCode,
-            city: city,
-        };
-    }
-}
-
 async function GetMinersPriceInfo() {
     let result = [];
-    const miners = await minersClient.GetMiners();
+
+    const miners = Array.from(minersSet);
 
     /*const miners = [
-        {miner:'f0152747'},
-        {miner:'f0673645'},
-        {miner:'f01033857'},
-        {miner:'f0143858'},
-        {miner:'f021255'},
-        {miner:'f0700033'},
-        {miner:'f042558'},
-        {miner:'f023198'},
-        {miner:'f0151366'},
-        {miner:'f01016198'},
-        {miner:'f0112087'},
-        {miner:'f01072221'},
-        {miner:'f0110567'},
-        {miner:'f01035680'},
-        {miner:'f01027268'},
-        {miner:'f02665'},
-        {miner:'f0734051'},
-        {miner:'f0828066'},
+       'f0152747',
+        'f0673645',
+       'f01033857',
+       'f0143858',
+        'f021255',
+        'f0700033',
+       'f042558',
+       'f023198',
+       'f0151366',
+        'f01016198',
+        'f0112087',
+        'f01072221',
+        'f0110567',
+        'f01035680',
+        'f01027268',
+        'f02665',
+        'f0734051',
+        'f0828066',
     ];*/
 
+    INFO(`GetMinersPriceInfo for ${miners?.length} miners`);
+
     if (miners?.length) {
-        for (const miner of miners) {
-            try {
-                let peerId = (await lotus.StateMinerInfo(miner.miner))?.data?.result?.PeerId;
-                let power = (await lotus.StateMinerPower(miner.miner))?.data?.result?.MinerPower?.QualityAdjPower;
+        var minersSlice = miners;
+        while (minersSlice.length) {
+            await Promise.all(minersSlice.splice(0, config.bot.lotus_api_rps).map(async (miner) => {
+                try {
+                    let peerId = (await lotus.StateMinerInfo(miner))?.data?.result?.PeerId;
+                    let power = (await lotus.StateMinerPower(miner))?.data?.result?.MinerPower?.QualityAdjPower;
 
-                if (!power || !peerId) {
-                    WARNING(`GetMinersPriceInfo[${miner.miner}] power: ${power}, peerId: ${peerId}`);
-                } else {
-                    let ask = await lotus.ClientQueryAsk(peerId, miner.miner);
-                    if (ask?.data?.result?.Price) {
-                        let price = ask?.data?.result?.Price;
-                        let location = undefined;
-
-                        location = locationMap.get(miner.miner);
-
-                        if (!location) {
-                            const peerInfoResponse = (await lotus.NetFindPeer(peerId).catch(() => undefined))?.data;
-                            console.log(peerInfoResponse);
-                            const addrs = peerInfoResponse?.result?.Addrs;
-
-                            if (addrs) {
-                                location = await GetMinerLocation(miner.miner, addrs);
-                                if (location) {
-                                    locationMap.set(miner.miner, location);
-                                }
-                            }
-
-                        }
-
-                        result.push({
-                            miner: miner.miner,
-                            power: miner.power,
-                            price: price,
-                            isoCode: location?.isoCode,
-                        });
-
-                        
-                        INFO(`GetMinersPriceInfo[${miner.miner} power: ${power}, peerId: ${peerId}, price: ${price}`);
+                    if (!power || !peerId) {
+                        WARNING(`GetMinersPriceInfo[${miner}] power: ${power}, peerId: ${peerId}`);
                     } else {
-                        INFO(`GetMinersPriceInfo[${miner.miner} power: ${power}, peerId: ${peerId} no price info`);
-                    }
-                }
+                        let ask = await lotus.ClientQueryAsk(peerId, miner);
+                        if (ask?.data?.result?.Price) {
+                            let price = ask?.data?.result?.Price;
+                            let region = ISOCodeToRegion(locationMap.get(miner));
 
-            } catch (e) {
-                INFO(`GetMinersPriceInfo[${miner.miner}] -> ${e}`);
-            }
+                            result.push({
+                                miner: miner,
+                                power: power,
+                                price: price,
+                                region: region,
+                            });
+
+
+                            INFO(`GetMinersPriceInfo[${miner} power: ${power}, peerId: ${peerId}, price: ${price}`);
+                        } else {
+                            INFO(`GetMinersPriceInfo[${miner} power: ${power}, peerId: ${peerId} no price info`);
+                        }
+                    }
+
+                } catch (e) {
+                    INFO(`GetMinersPriceInfo[${miner}] -> ${e}`);
+                }
+            }));
 
             if (stop) {
                 break;
             }
+
         }
     }
 
@@ -148,11 +132,13 @@ const mainLoop = async _ => {
     try {
         INFO('FilMarket Bot start');
 
-        await GetFILPrice();
-
         while (!stop) {
+            await RefreshMinersList();
+    
             let data = await GetMinersPriceInfo();
             console.log(data);
+
+            await GetFILPrice();
 
             stop = true;
 

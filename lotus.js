@@ -1,14 +1,15 @@
 'use strict';
 
+const config = require('./config');
 const axios = require('axios');
-const { rateLimit } = require('axios-rate-limit');
+const rateLimit = require('axios-rate-limit');
 
 class Lotus {
     constructor(api, token) {
         this.id = 0
         this.api = api;
         this.token = token;
-        this.http = rateLimit(axios.create(), { maxRequests: 5, perMilliseconds: 1000, maxRPS: 5 })
+        this.http = rateLimit(axios.create(), { maxRequests: config.bot.lotus_api_rps, perMilliseconds: 1000, maxRPS: config.bot.lotus_api_rps })
     }
 
     async LotusAPI(method, params, timeout = 10000) {
