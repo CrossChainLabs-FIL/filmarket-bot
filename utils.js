@@ -1,5 +1,7 @@
 var BigNumber = require('bignumber.js');
 
+const TB = 931.32257461548 //GiB
+
 function FormatSize(bytes, decimals = 2) {
     if (0 === bytes) return "0 Bytes";
     const c = 0 > decimals ? 0 : decimals;
@@ -62,6 +64,21 @@ function FormatPriceFIL(attoFil) {
   return `${atto.toFixed()} attoFIL`;
 }
 
+function IsValidPriceFIL(attoFil) {
+    let valid = true;
+    let atto = new BigNumber(attoFil);
+
+    if (atto.isNaN()) {
+      return false;
+    }
+  
+    if (atto.isGreaterThanOrEqualTo(BigNumber(10).pow(12))) {
+        valid = false;
+    }
+
+    return valid;
+}
+
 function FormatPriceUSD(priceUSD) {
     let price = new BigNumber(priceUSD);
 
@@ -76,6 +93,21 @@ function FormatPriceUSD(priceUSD) {
     return `${price.decimalPlaces(8).toFixed()} USD`;
 }
 
+function ConvertToTBPrice(priceGiB) {
+    let price = new BigNumber(priceGiB);
+
+    if (price.isNaN()) {
+        return 'N/A';
+    }
+
+    if (price.isZero()) {
+        return '0 USD';
+    }
+
+    return `${price.multipliedBy(TB).decimalPlaces(8).toFixed()}`;
+
+}
+
 module.exports = {
     FormatSize,
     TimeDeltaH,
@@ -83,4 +115,6 @@ module.exports = {
     FormatPriceUSD,
     ToFIL,
     ToUSD,
+    IsValidPriceFIL,
+    ConvertToTBPrice,
 };

@@ -1,10 +1,12 @@
 const config = require('./config');
 const { INFO, ERROR, WARNING } = require('./logs');
-const { FormatSize, TimeDeltaH } = require('./utils');
+const { FormatSize, TimeDeltaH, FormatPriceFIL, FormatPriceUSD, ToFIL, ToUSD, IsValidPriceFIL, ConvertToTBPrice } = require('./utils');
 const { Lotus } = require("./lotus");
 const { MinersClient } = require("./miners-client");
 const { ISOCodeToRegion } = require("./location");
 const CoinMarketCap = require('coinmarketcap-api')
+
+var BigNumber = require('bignumber.js');
 
 const coinMarketCap = new CoinMarketCap(config.bot.coinmarketcap_apikey);
 
@@ -90,7 +92,7 @@ async function GetMinersPriceInfo() {
                     let power = (await lotus.StateMinerPower(miner))?.data?.result?.MinerPower?.QualityAdjPower;
 
                     if (!power || !peerId) {
-                        WARNING(`GetMinersPriceInfo[${miner}] power: ${power}, peerId: ${peerId}`);
+                        INFO(`GetMinersPriceInfo[${miner}] power: ${power}, peerId: ${peerId} skip, invalid power or peerId`);
                     } else {
                         let ask = await lotus.ClientQueryAsk(peerId, miner);
                         if (ask?.data?.result?.Price) {
@@ -105,14 +107,18 @@ async function GetMinersPriceInfo() {
                             });
 
 
-                            INFO(`GetMinersPriceInfo[${miner} power: ${power}, peerId: ${peerId}, price: ${price}`);
+                            INFO(`GetMinersPriceInfo[${miner}] power: ${power}, peerId: ${peerId}, price: ${price}`);
                         } else {
-                            INFO(`GetMinersPriceInfo[${miner} power: ${power}, peerId: ${peerId} no price info`);
+                            INFO(`GetMinersPriceInfo[${miner}] power: ${power}, peerId: ${peerId} skip, no price info`);
                         }
                     }
 
                 } catch (e) {
-                    INFO(`GetMinersPriceInfo[${miner}] -> ${e}`);
+                    if (e?.code != 'ECONNABORTED') {
+                        INFO(`GetMinersPriceInfo[${miner}] -> ${e}`);
+                    } else {
+                        INFO(`GetMinersPriceInfo[${miner}] skip, no price info`);
+                    }
                 }
             }));
 
@@ -126,6 +132,99 @@ async function GetMinersPriceInfo() {
     return result;
 }
 
+async function CalculateAverages(miners) {
+    let result = [];
+    let filPrice = await GetFILPrice();
+    let filPriceBN = new BigNumber(filPrice);
+
+    let globalPrice = new BigNumber(0);
+    let asiaPrice = new BigNumber(0);
+    let northAmericaPrice = new BigNumber(0);
+    let otherPrice = new BigNumber(0);
+    let europePrice = new BigNumber(0);
+
+    let globalCount = 0;
+    let asiaCount = 0;
+    let northAmericaCount = 0;
+    let otherCount = 0;
+    let europeCount = 0;
+
+    if (!filPrice || filPriceBN.isNaN()) {
+        ERROR(`CalculateAverages[${m.miner}] invalid FIL price ${filPrice}`);
+        return result;
+    }
+
+    for (const m of miners) {
+        let priceUSD = ToUSD(ToFIL(m.price), filPrice);
+        let priceUSD_BN = new BigNumber(ConvertToTBPrice(priceUSD));
+
+        if (!priceUSD_BN.isNaN() && IsValidPriceFIL(m.price)) {
+            switch (m.region) {
+                case 'Other':
+                    globalPrice = globalPrice.plus(priceUSD_BN);
+                    otherPrice = otherPrice.plus(priceUSD_BN);
+                    globalCount++;
+                    otherCount++;
+                    break;
+                case 'Europe':
+                    globalPrice = globalPrice.plus(priceUSD_BN);
+                    europePrice = europePrice.plus(priceUSD_BN);
+                    globalCount++;
+                    europeCount++;
+                    break;
+                case 'Asia':
+                    globalPrice = globalPrice.plus(priceUSD_BN);
+                    asiaPrice = asiaPrice.plus(priceUSD_BN);
+                    globalCount++;
+                    asiaCount++;
+                    break;
+                case 'North America':
+                    globalPrice = globalPrice.plus(priceUSD_BN);
+                    northAmericaPrice = northAmericaPrice.plus(priceUSD_BN);
+                    globalCount++;
+                    northAmericaCount++
+                    break;
+                default:
+                    ERROR(`CalculateAverages[${m.miner}] invalid region ${m.region}`);
+            }
+
+            result.push({
+                miner: m.miner,
+                power: FormatSize(m.power),
+                priceFIL: FormatPriceFIL(ConvertToTBPrice(m.price)),
+                priceUSD: FormatPriceUSD(ConvertToTBPrice(priceUSD)),
+                priceGiB_attoFIL: m.price,
+                region: m.region,
+            });
+        }
+    }
+
+    return {
+        FILPrice: filPriceBN.decimalPlaces(2).toFixed(),
+        Global: { 
+            price: globalPrice.dividedBy(globalCount).decimalPlaces(8).toFixed(),
+            count: globalCount,
+        },
+        Asia: {
+            price: asiaPrice.dividedBy(asiaCount).decimalPlaces(8).toFixed(),
+            count: asiaCount,
+        },
+        NorthAmerica: {
+            price: northAmericaPrice.dividedBy(northAmericaCount).decimalPlaces(8).toFixed(),
+            count: northAmericaCount,
+        },
+        Other: {
+            price: otherPrice.dividedBy(otherCount).decimalPlaces(8).toFixed(),
+            count: otherCount,
+        },
+        Europe: {
+            price: europePrice.dividedBy(europeCount).decimalPlaces(8).toFixed(),
+            count: europeCount,
+        },
+        miners: result
+    };
+}
+
 const pause = (timeout) => new Promise(res => setTimeout(res, timeout * 1000));
 
 const mainLoop = async _ => {
@@ -135,10 +234,17 @@ const mainLoop = async _ => {
         while (!stop) {
             await RefreshMinersList();
     
-            let data = await GetMinersPriceInfo();
-            console.log(data);
+            let miners = await GetMinersPriceInfo();
+            let data = await CalculateAverages(miners);
 
-            await GetFILPrice();
+            console.log(data);
+            console.log('miners', data.miners.length);
+            console.log('FILPrice', data.FILPrice);
+            console.log('Global', data.Global);
+            console.log('Asia', data.Asia);
+            console.log('NorthAmerica', data.NorthAmerica);
+            console.log('Other', data.Other);
+            console.log('Europe',data.Europe);
 
             stop = true;
 
