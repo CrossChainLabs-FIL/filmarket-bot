@@ -58,9 +58,9 @@ async function GetFILPrice() {
 async function GetMinersPriceInfo() {
     let result = [];
 
-    const miners = Array.from(minersSet);
+    //const miners = Array.from(minersSet);
 
-    /*const miners = [
+    const miners = [
        'f0152747',
         'f0673645',
        'f01033857',
@@ -79,9 +79,13 @@ async function GetMinersPriceInfo() {
         'f02665',
         'f0734051',
         'f0828066',
-    ];*/
+    ];
 
     INFO(`GetMinersPriceInfo for ${miners?.length} miners`);
+    let asia = 0;
+    let north_america = 0;
+    let other = 0;
+    let europe = 0;
 
     if (miners?.length) {
         var minersSlice = miners;
@@ -94,11 +98,29 @@ async function GetMinersPriceInfo() {
                     if (!power || !peerId) {
                         INFO(`GetMinersPriceInfo[${miner}] power: ${power}, peerId: ${peerId} skip, invalid power or peerId`);
                     } else {
+                        let region = ISOCodeToRegion(locationMap.get(miner));
+
+                        switch (region) {
+                            case 'Other':
+                                other++;
+                                break;
+                            case 'Europe':
+                                europe++;
+                                break;
+                            case 'Asia':
+                                asia++;
+                                break;
+                            case 'North America':
+                                north_america++
+                                break;
+                            default:
+                                ERROR(`CalculateAverages[${m.miner}] invalid region ${m.region}`);
+                        }
+
                         let ask = await lotus.ClientQueryAsk(peerId, miner);
                         if (ask?.data?.result?.Price) {
                             let price = ask?.data?.result?.Price;
-                            let region = ISOCodeToRegion(locationMap.get(miner));
-
+                            
                             result.push({
                                 miner: miner,
                                 power: power,
@@ -129,7 +151,15 @@ async function GetMinersPriceInfo() {
         }
     }
 
-    return result;
+    return {
+        miners_count: {
+            asia: asia,
+            north_america: north_america,
+            other: other,
+            europe: europe,
+        },
+        miners: result
+    };
 }
 
 async function CalculateAverages(miners) {
@@ -234,8 +264,8 @@ const mainLoop = async _ => {
         while (!stop) {
             await RefreshMinersList();
     
-            let miners = await GetMinersPriceInfo();
-            let data = await CalculateAverages(miners);
+            let miners_data = await GetMinersPriceInfo();
+            let data = await CalculateAverages(miners_data.miners);
 
             console.log(data);
             console.log('miners', data.miners.length);
@@ -245,6 +275,8 @@ const mainLoop = async _ => {
             console.log('NorthAmerica', data.NorthAmerica);
             console.log('Other', data.Other);
             console.log('Europe',data.Europe);
+
+            console.log('Active Miners:', miners_data.miners_count);
 
             stop = true;
 
