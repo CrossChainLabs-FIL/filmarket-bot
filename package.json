@@ -4,7 +4,8 @@
     "description": "FilMarket Bot",
     "scripts": {
         "start": "env-cmd node index.js",
-        "test-miners": "env-cmd node miners-client-test.js"
+        "test-miners": "env-cmd node miners-client-test.js",
+        "test-near": "env-cmd node near-test.js"
     },
     "repository": {
         "type": "git",
@@ -23,6 +24,7 @@
         "bignumber.js": "^9.0.2",
         "coinmarketcap-api": "^3.1.1",
         "env-cmd": "^10.1.0",
+        "near-api-js": "^0.44.2",
         "time-stamp": "^2.2.0"
     }
 }
