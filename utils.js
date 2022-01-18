@@ -1,3 +1,5 @@
+var BigNumber = require('bignumber.js');
+
 function FormatSize(bytes, decimals = 2) {
     if (0 === bytes) return "0 Bytes";
     const c = 0 > decimals ? 0 : decimals;
@@ -9,7 +11,76 @@ function TimeDeltaH(timestamp) {
     return (Math.abs(Date.now() - timestamp) / (1000 * 3600)).toFixed();
 }
 
+function ToUSD(fil, filPriceUSD) {
+    let f = new BigNumber(fil);
+    let p = new BigNumber(filPriceUSD);
+
+    if (f.isNaN() || p.isNaN()) {
+        return 'N/A';
+    }
+
+    if (f.isZero() || p.isZero()) {
+        return '0';
+    }
+
+    return `${f.multipliedBy(p).decimalPlaces(18).toFixed()}`;
+}
+
+function ToFIL(attoFil) {
+    let atto = new BigNumber(attoFil);
+
+    if (atto.isNaN()) {
+        return 'N/A';
+    }
+
+    if (atto.isZero()) {
+        return '0';
+    }
+
+    return `${atto.shiftedBy(-18).decimalPlaces(18).toFixed()}`;
+}
+
+function FormatPriceFIL(attoFil) {
+  let atto = new BigNumber(attoFil);
+
+  if (atto.isNaN()) {
+    return 'N/A';
+  }
+
+  if (atto.isZero()) {
+    return '0 FIL';
+  }
+
+  if (atto.isGreaterThanOrEqualTo(BigNumber(10).pow(14))) {
+    return `${atto.shiftedBy(-18).decimalPlaces(4).toFixed()} FIL`;
+  }
+
+  if (atto.isGreaterThanOrEqualTo(BigNumber(10).pow(5))) {
+    return `${atto.shiftedBy(-9).decimalPlaces(4).toFixed()} nanoFIL`;
+  }
+
+  return `${atto.toFixed()} attoFIL`;
+}
+
+function FormatPriceUSD(priceUSD) {
+    let price = new BigNumber(priceUSD);
+
+    if (price.isNaN()) {
+        return 'N/A';
+    }
+
+    if (price.isZero()) {
+        return '0 USD';
+    }
+
+    return `${price.decimalPlaces(8).toFixed()} USD`;
+}
+
 module.exports = {
     FormatSize,
     TimeDeltaH,
+    FormatPriceFIL,
+    FormatPriceUSD,
+    ToFIL,
+    ToUSD,
 };
