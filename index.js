@@ -4,6 +4,7 @@ const { FormatSize, TimeDeltaH, FormatPriceFIL, FormatPriceUSD, ToFIL, ToUSD, Is
 const { Lotus } = require("./lotus");
 const { MinersClient } = require("./miners-client");
 const { ISOCodeToRegion } = require("./location");
+const { Near } = require('./near');
 const CoinMarketCap = require('coinmarketcap-api')
 
 var BigNumber = require('bignumber.js');
@@ -14,7 +15,7 @@ let stop = false;
 let lotus = new Lotus(config.bot.lotus_api);
 let locationMap = new Map();
 let minersSet = new Set();
-
+let near = new Near();
 
 async function RefreshMinersList() {
     let minersClient_FG = new MinersClient(config.bot.miners_api_fg);
@@ -152,11 +153,11 @@ async function GetMinersPriceInfo() {
     }
 
     return {
-        miners_count: {
+        active_per_region: {
+            europe: europe,
             asia: asia,
             north_america: north_america,
             other: other,
-            europe: europe,
         },
         miners: result
     };
@@ -219,39 +220,25 @@ async function CalculateAverages(miners) {
             }
 
             result.push({
-                miner: m.miner,
-                power: FormatSize(m.power),
-                priceFIL: FormatPriceFIL(ConvertToTBPrice(m.price)),
-                priceUSD: FormatPriceUSD(ConvertToTBPrice(priceUSD)),
-                priceGiB_attoFIL: m.price,
+                id: m.miner,
                 region: m.region,
+                power: FormatSize(m.power),
+                price: FormatPriceUSD(ConvertToTBPrice(priceUSD)),
+                price_fil: FormatPriceFIL(ConvertToTBPrice(m.price)),
             });
         }
     }
 
     return {
-        FILPrice: filPriceBN.decimalPlaces(2).toFixed(),
-        Global: { 
-            price: globalPrice.dividedBy(globalCount).decimalPlaces(8).toFixed(),
-            count: globalCount,
+        FIL_price: filPriceBN.decimalPlaces(2).toFixed(),
+        global_price: globalPrice.dividedBy(globalCount).decimalPlaces(8).toFixed(),
+        price_per_region: {
+            europe: europePrice.dividedBy(europeCount).decimalPlaces(8).toFixed(),
+            asia: asiaPrice.dividedBy(asiaCount).decimalPlaces(8).toFixed(),
+            north_america: northAmericaPrice.dividedBy(northAmericaCount).decimalPlaces(8).toFixed(),
+            other: otherPrice.dividedBy(otherCount).decimalPlaces(8).toFixed(),
         },
-        Asia: {
-            price: asiaPrice.dividedBy(asiaCount).decimalPlaces(8).toFixed(),
-            count: asiaCount,
-        },
-        NorthAmerica: {
-            price: northAmericaPrice.dividedBy(northAmericaCount).decimalPlaces(8).toFixed(),
-            count: northAmericaCount,
-        },
-        Other: {
-            price: otherPrice.dividedBy(otherCount).decimalPlaces(8).toFixed(),
-            count: otherCount,
-        },
-        Europe: {
-            price: europePrice.dividedBy(europeCount).decimalPlaces(8).toFixed(),
-            count: europeCount,
-        },
-        miners: result
+        storage_providers: result
     };
 }
 
@@ -260,6 +247,8 @@ const pause = (timeout) => new Promise(res => setTimeout(res, timeout * 1000));
 const mainLoop = async _ => {
     try {
         INFO('FilMarket Bot start');
+        INFO('NEAR Init');
+        await near.Init();
 
         while (!stop) {
             await RefreshMinersList();
@@ -267,16 +256,14 @@ const mainLoop = async _ => {
             let miners_data = await GetMinersPriceInfo();
             let data = await CalculateAverages(miners_data.miners);
 
-            console.log(data);
-            console.log('miners', data.miners.length);
-            console.log('FILPrice', data.FILPrice);
-            console.log('Global', data.Global);
-            console.log('Asia', data.Asia);
-            console.log('NorthAmerica', data.NorthAmerica);
-            console.log('Other', data.Other);
-            console.log('Europe',data.Europe);
+            await near.SetActivePerRegion(miners_data.active_per_region);
+            await near.UpdateStorageProviders(data.storage_providers);
+            await near.SetGlobalPrice(data.global_price);
+            await near.SetPricePerRegion(data.price_per_region);
 
-            console.log('Active Miners:', miners_data.miners_count);
+            INFO(`Average global price: ${JSON.stringify(data.price_per_region)}`);
+            INFO(`Average price per region: ${JSON.stringify(data.price_per_region)}`);
+            INFO(`Active per region: ${JSON.stringify(miners_data.active_per_region)}`);
 
             stop = true;
 
