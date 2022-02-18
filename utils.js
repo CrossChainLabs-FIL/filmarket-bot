@@ -1,12 +1,18 @@
 var BigNumber = require('bignumber.js');
 
-const TB = 931.32257461548 //GiB
+const TB = 931.32257461548; //GiB
+const EPOCHS = 1051200; //epochs per year
 
 function FormatSize(bytes, decimals = 2) {
     if (0 === bytes) return "0 Bytes";
     const c = 0 > decimals ? 0 : decimals;
     const d = Math.floor(Math.log(bytes) / Math.log(1024));
     return parseFloat((bytes / Math.pow(1024, d)).toFixed(c)) + " " + ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"][d];
+}
+
+function ConvertBytesToGiB(bytes) {
+    if (0 === bytes) return 0;
+    return (bytes / ( Math.pow(1024, 3) )).toString();
 }
 
 function TimeDeltaH(timestamp) {
@@ -90,7 +96,14 @@ function FormatPriceUSD(priceUSD) {
         return '0 USD';
     }
 
-    return `${price.decimalPlaces(8).toFixed()} USD`;
+    return `${price.decimalPlaces(4).toFixed()} USD`;
+}
+
+function ConvertToTBPricePerYear(askPrice) {    
+    let epochPriceGiB = new BigNumber(askPrice);
+    let yearPriceGiB = epochPriceGiB.multipliedBy(EPOCHS);
+  
+    return `${yearPriceGiB.multipliedBy(TB).decimalPlaces(8).toFixed()}`;
 }
 
 function ConvertToTBPrice(priceGiB) {
@@ -117,4 +130,6 @@ module.exports = {
     ToUSD,
     IsValidPriceFIL,
     ConvertToTBPrice,
+    ConvertToTBPricePerYear,
+    ConvertBytesToGiB
 };

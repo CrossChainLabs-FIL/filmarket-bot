@@ -1,6 +1,16 @@
 const config = require('./config');
 const { INFO, ERROR, WARNING } = require('./logs');
-const { FormatSize, TimeDeltaH, FormatPriceFIL, FormatPriceUSD, ToFIL, ToUSD, IsValidPriceFIL, ConvertToTBPrice } = require('./utils');
+const {
+    FormatSize,
+    TimeDeltaH,
+    FormatPriceFIL,
+    FormatPriceUSD,
+    ToFIL,
+    ToUSD,
+    IsValidPriceFIL,
+    ConvertToTBPricePerYear,
+    ConvertBytesToGiB
+} = require('./utils');
 const { Lotus } = require("./lotus");
 const { MinersClient } = require("./miners-client");
 const { ISOCodeToRegion } = require("./location");
@@ -81,7 +91,6 @@ async function GetMinersPriceInfo() {
         'f0734051',
         'f0828066',
     ];
-
     INFO(`GetMinersPriceInfo for ${miners?.length} miners`);
     let asia = 0;
     let north_america = 0;
@@ -94,7 +103,9 @@ async function GetMinersPriceInfo() {
             await Promise.all(minersSlice.splice(0, config.bot.lotus_api_rps).map(async (miner) => {
                 try {
                     let peerId = (await lotus.StateMinerInfo(miner))?.data?.result?.PeerId;
-                    let power = (await lotus.StateMinerPower(miner))?.data?.result?.MinerPower?.QualityAdjPower;
+                    let power_response = (await lotus.StateMinerPower(miner))?.data?.result;
+
+                    let power = power_response?.MinerPower?.QualityAdjPower;
 
                     if (!power || !peerId) {
                         INFO(`GetMinersPriceInfo[${miner}] power: ${power}, peerId: ${peerId} skip, invalid power or peerId`);
@@ -119,16 +130,16 @@ async function GetMinersPriceInfo() {
                         }
 
                         let ask = await lotus.ClientQueryAsk(peerId, miner);
-                        if (ask?.data?.result?.Price) {
-                            let price = ask?.data?.result?.Price;
-                            
-                            result.push({
+                        let price = ask?.data?.result?.Price;
+                        if (price && IsValidPriceFIL(price)) {
+                            let miner_data = {
                                 miner: miner,
                                 power: power,
-                                price: price,
+                                price: ConvertToTBPricePerYear(price),
                                 region: region,
-                            });
-
+                            }
+                            
+                            result.push(miner_data);
 
                             INFO(`GetMinersPriceInfo[${miner}] power: ${power}, peerId: ${peerId}, price: ${price}`);
                         } else {
@@ -187,9 +198,9 @@ async function CalculateAverages(miners) {
 
     for (const m of miners) {
         let priceUSD = ToUSD(ToFIL(m.price), filPrice);
-        let priceUSD_BN = new BigNumber(ConvertToTBPrice(priceUSD));
+        let priceUSD_BN = new BigNumber(priceUSD);
 
-        if (!priceUSD_BN.isNaN() && IsValidPriceFIL(m.price)) {
+        if (!priceUSD_BN.isNaN()) {
             switch (m.region) {
                 case 'Other':
                     globalPrice = globalPrice.plus(priceUSD_BN);
@@ -222,21 +233,21 @@ async function CalculateAverages(miners) {
             result.push({
                 id: m.miner,
                 region: m.region,
-                power: FormatSize(m.power),
-                price: FormatPriceUSD(ConvertToTBPrice(priceUSD)),
-                price_fil: FormatPriceFIL(ConvertToTBPrice(m.price)),
+                power: ConvertBytesToGiB(m.power),
+                price: FormatPriceUSD(priceUSD),
+                price_fil: FormatPriceFIL(m.price),
             });
         }
     }
 
     return {
         FIL_price: filPriceBN.decimalPlaces(2).toFixed(),
-        global_price: globalPrice.dividedBy(globalCount).decimalPlaces(8).toFixed(),
+        global_price: globalPrice.dividedBy(globalCount).decimalPlaces(4).toFixed(),
         price_per_region: {
-            europe: europePrice.dividedBy(europeCount).decimalPlaces(8).toFixed(),
-            asia: asiaPrice.dividedBy(asiaCount).decimalPlaces(8).toFixed(),
-            north_america: northAmericaPrice.dividedBy(northAmericaCount).decimalPlaces(8).toFixed(),
-            other: otherPrice.dividedBy(otherCount).decimalPlaces(8).toFixed(),
+            europe: europePrice.dividedBy(europeCount).decimalPlaces(4).toFixed(),
+            asia: asiaPrice.dividedBy(asiaCount).decimalPlaces(4).toFixed(),
+            north_america: northAmericaPrice.dividedBy(northAmericaCount).decimalPlaces(4).toFixed(),
+            other: otherPrice.dividedBy(otherCount).decimalPlaces(4).toFixed(),
         },
         storage_providers: result
     };
