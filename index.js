@@ -9,11 +9,12 @@ const {
     ToUSD,
     IsValidPriceFIL,
     ConvertToTBPricePerYear,
-    ConvertBytesToGiB
+    ConvertBytesToGiB,
+    FormatValue
 } = require('./utils');
 const { Lotus } = require("./lotus");
 const { MinersClient } = require("./miners-client");
-const { ISOCodeToRegion } = require("./location");
+const { Regions, ISOCodeToRegion } = require("./location");
 const { Near } = require('./near');
 const CoinMarketCap = require('coinmarketcap-api')
 
@@ -91,6 +92,7 @@ async function GetMinersPriceInfo() {
         'f0734051',
         'f0828066',
     ];
+
     INFO(`GetMinersPriceInfo for ${miners?.length} miners`);
     let asia = 0;
     let north_america = 0;
@@ -113,20 +115,20 @@ async function GetMinersPriceInfo() {
                         let region = ISOCodeToRegion(locationMap.get(miner));
 
                         switch (region) {
-                            case 'Other':
+                            case Regions['Other']:
                                 other++;
                                 break;
-                            case 'Europe':
+                            case Regions['Europe']:
                                 europe++;
                                 break;
-                            case 'Asia':
+                            case Regions['Asia']:
                                 asia++;
                                 break;
-                            case 'North America':
+                            case Regions['North America']:
                                 north_america++
                                 break;
                             default:
-                                ERROR(`CalculateAverages[${m.miner}] invalid region ${m.region}`);
+                                ERROR(`CalculateAverages[${miner}] invalid region ${region}`);
                         }
 
                         let ask = await lotus.ClientQueryAsk(peerId, miner);
@@ -202,25 +204,25 @@ async function CalculateAverages(miners) {
 
         if (!priceUSD_BN.isNaN()) {
             switch (m.region) {
-                case 'Other':
+                case Regions['Other']:
                     globalPrice = globalPrice.plus(priceUSD_BN);
                     otherPrice = otherPrice.plus(priceUSD_BN);
                     globalCount++;
                     otherCount++;
                     break;
-                case 'Europe':
+                case Regions['Europe']:
                     globalPrice = globalPrice.plus(priceUSD_BN);
                     europePrice = europePrice.plus(priceUSD_BN);
                     globalCount++;
                     europeCount++;
                     break;
-                case 'Asia':
+                case Regions['Asia']:
                     globalPrice = globalPrice.plus(priceUSD_BN);
                     asiaPrice = asiaPrice.plus(priceUSD_BN);
                     globalCount++;
                     asiaCount++;
                     break;
-                case 'North America':
+                case Regions['North America']:
                     globalPrice = globalPrice.plus(priceUSD_BN);
                     northAmericaPrice = northAmericaPrice.plus(priceUSD_BN);
                     globalCount++;
@@ -234,15 +236,14 @@ async function CalculateAverages(miners) {
                 id: m.miner,
                 region: m.region,
                 power: ConvertBytesToGiB(m.power),
-                price: FormatPriceUSD(priceUSD),
-                price_fil: FormatPriceFIL(m.price),
+                price: parseFloat(ToFIL(m.price)),
             });
         }
     }
 
     return {
-        FIL_price: filPriceBN.decimalPlaces(2).toFixed(),
-        global_price: globalPrice.dividedBy(globalCount).decimalPlaces(4).toFixed(),
+        FIL_price: parseFloat(filPriceBN),
+        global_price: parseFloat(globalPrice.dividedBy(globalCount)),
         price_per_region: {
             europe: europePrice.dividedBy(europeCount).decimalPlaces(4).toFixed(),
             asia: asiaPrice.dividedBy(asiaCount).decimalPlaces(4).toFixed(),
@@ -270,6 +271,7 @@ const mainLoop = async _ => {
             await near.SetActivePerRegion(miners_data.active_per_region);
             await near.UpdateStorageProviders(data.storage_providers);
             await near.SetGlobalPrice(data.global_price);
+            await near.SetFILPrice(data.FIL_price);
             await near.SetPricePerRegion(data.price_per_region);
 
             INFO(`Average global price: ${JSON.stringify(data.price_per_region)}`);

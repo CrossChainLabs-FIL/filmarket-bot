@@ -250,20 +250,28 @@ const iso2region = {
     ZW: 'Other',
   };
 
-function ISOCodeToRegion(isoCode) {
-    if (!isoCode) {
-        return 'Other';
-    }
+  const Regions = {
+    "North America":1, 
+    "Europe":2, 
+    "Asia":3, 
+    "Other":4 
+};
 
-    let region = iso2region[isoCode];
+function ISOCodeToRegion(isoCode) {
+    let region = 'Other';
+
+    if (isoCode) {
+        region = iso2region[isoCode];
+    }
 
     if (!region) {
         region = 'Other';
     }
 
-    return region;
+    return Regions[region];
 }
 
 module.exports = {
+    Regions,
     ISOCodeToRegion
 };

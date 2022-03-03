@@ -12,7 +12,7 @@ function FormatSize(bytes, decimals = 2) {
 
 function ConvertBytesToGiB(bytes) {
     if (0 === bytes) return 0;
-    return (bytes / ( Math.pow(1024, 3) )).toString();
+    return (bytes / ( Math.pow(1024, 3) ));
 }
 
 function TimeDeltaH(timestamp) {
@@ -32,6 +32,20 @@ function ToUSD(fil, filPriceUSD) {
     }
 
     return `${f.multipliedBy(p).decimalPlaces(18).toFixed()}`;
+}
+
+function FormatValue(value, decimals) {
+    let valueBN = new BigNumber(value);
+
+    if (valueBN.isNaN()) {
+        return 'N/A';
+    }
+
+    if (valueBN.isZero()) {
+        return '0';
+    }
+
+    return `${valueBN.decimalPlaces(decimals).toFixed()}`;
 }
 
 function ToFIL(attoFil) {
@@ -131,5 +145,6 @@ module.exports = {
     IsValidPriceFIL,
     ConvertToTBPrice,
     ConvertToTBPricePerYear,
-    ConvertBytesToGiB
+    ConvertBytesToGiB,
+    FormatValue
 };

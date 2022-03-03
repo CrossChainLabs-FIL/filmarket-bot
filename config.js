@@ -36,6 +36,7 @@ module.exports = {
     maxmind_id: process.env.MAXMIND_ID || '',
     maxmind_token: process.env.MAXMIND_TOKEN || '',
     coinmarketcap_apikey: process.env.COINMARKETCAP_APIKEY || '',
+    update_slice: process.env.UPDATE_SLICE || 10,
   },
   near: {
     account_id:  process.env.ACCOUNT_ID || '',
