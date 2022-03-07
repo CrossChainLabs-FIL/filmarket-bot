@@ -8,8 +8,19 @@ const GAS = Big(3).times(10 ** 14).toFixed();
 const near_config = config.getConfig(process.env.NODE_ENV || 'development');
 
 const contractConfig = {
-    viewMethods: ['get_storage_providers', 'get_active_per_region', 'get_price_per_region'],
-    changeMethods: ['new', 'update_storage_providers', 'set_active_per_region', 'set_price_per_region']
+    viewMethods: [
+        'get_storage_providers', 
+        'get_active_per_region', 
+        'get_price_per_region_list', 
+        'get_latest_price_per_region'
+    ],
+    changeMethods: [
+        'update_storage_providers',
+        'delete_storage_providers',
+        'set_active_per_region',
+        'set_price_per_region',
+        'delete_price_per_region'
+    ]
 }
 
 class Near {
@@ -44,6 +55,24 @@ class Near {
                         meta: 'Update storage providers',
                         callbackUrl: undefined,
                         args: { storage_providers: spsSlice.splice(0, config.bot.update_slice) },
+                        amount: 0
+                    });
+                } catch (e) {
+
+                }
+            }
+        }
+    }
+
+    async DeleteStorageProviders(storage_providers) {
+        if (storage_providers?.length) {
+            var spsSlice = storage_providers;
+            while (spsSlice.length) {
+                try {
+                    await this.contract.delete_storage_providers({
+                        meta: 'Delete storage providers',
+                        callbackUrl: undefined,
+                        args: { storage_providers: spsSlice.splice(0, config.bot.delete_slice) },
                         amount: 0
                     });
                 } catch (e) {

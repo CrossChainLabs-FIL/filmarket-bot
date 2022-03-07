@@ -95,6 +95,7 @@ async function GetMinersPriceInfo() {
     let north_america = 0;
     let other = 0;
     let europe = 0;
+    let total_power = 0;
 
     if (miners?.length) {
         var minersSlice = miners;
@@ -104,9 +105,15 @@ async function GetMinersPriceInfo() {
                     let peerId = (await lotus.StateMinerInfo(miner))?.data?.result?.PeerId;
                     let power_response = (await lotus.StateMinerPower(miner))?.data?.result;
 
-                    let power = power_response?.MinerPower?.QualityAdjPower;
+                    if (!total_power) {
+                        let total_powerBN = new BigNumber(power_response?.TotalPower?.QualityAdjPower);
+                        total_power = parseInt(total_powerBN.dividedBy(Math.pow(1024, 4)));
+                    }
 
-                    if (!power || !peerId) {
+                    let power = power_response?.MinerPower?.QualityAdjPower;
+                    let powerValue = parseInt(power);
+
+                    if (isNaN(powerValue) ||  powerValue <= 0 || !peerId) {
                         INFO(`GetMinersPriceInfo[${miner}] power: ${power}, peerId: ${peerId} skip, invalid power or peerId`);
                     } else {
                         let region = ISOCodeToRegion(locationMap.get(miner));
@@ -169,11 +176,12 @@ async function GetMinersPriceInfo() {
             north_america: north_america,
             other: other,
         },
+        total_power: total_power,
         miners: result
     };
 }
 
-async function CalculateAverages(miners) {
+async function CalculateAverages(miners, total_power) {
     let result = [];
     let filPrice = await GetFILPrice();
     let filPriceBN = new BigNumber(filPrice);
@@ -254,10 +262,75 @@ async function CalculateAverages(miners) {
             other: FormatFloatValue(valueOther),
             global: FormatFloatValue(valueGlobal),
             fil_price: FormatFloatValue(valueFILPrice),
+            power: total_power,
             timestamp: FormatIntValue(valueTimestamp),
         },
         storage_providers: result
     };
+}
+
+async function FilterStorageProviders(storage_providers) {
+    const spsSet = new Set();
+    const spsFromContractMap = new Map();
+    let storage_providers_update = [];
+    let storage_providers_delete = [];
+    let update_reason_price = 0;
+    let update_reason_region = 0;
+    let update_reason_power = 0;
+    let update_reason_new = 0;
+
+    if (storage_providers?.length) {
+        storage_providers.forEach(sp => {
+            spsSet.add(sp.id);
+        });
+    }
+
+    let storage_providers_from_contract = await near.GetStorageProviders();
+    if (storage_providers_from_contract?.length) {
+        storage_providers_from_contract.forEach(sp => {
+            spsFromContractMap.set(sp.id, sp);
+        });
+    }
+
+    storage_providers.forEach(sp => {
+        if (!spsFromContractMap.has(sp.id)) {
+            update_reason_new++;
+            storage_providers_update.push(sp);
+        } else {
+            let spFromContract = spsFromContractMap.get(sp.id);
+            if (spFromContract.price != sp.price) {
+                update_reason_price++;
+                storage_providers_update.push(sp);
+            } else if (spFromContract.region != sp.region) {
+                update_reason_region++;
+                storage_providers_update.push(sp);
+            } else if (spFromContract.power != sp.power) {
+                update_reason_power++;
+                storage_providers_update.push(sp);
+            }
+        }
+    });
+
+    storage_providers_from_contract.forEach(sp => { 
+        if (!spsSet.has(sp.id)) {
+            storage_providers_delete.push(sp.id);
+        }
+    });
+
+    INFO(`FilterStorageProviders total [${storage_providers.length}] , update [${storage_providers_update.length}] , delete [${storage_providers_delete.length}]`);
+    INFO(`FilterStorageProviders update_reason_price : ${update_reason_price} `);
+    INFO(`FilterStorageProviders update_reason_power : ${update_reason_power} `);
+    INFO(`FilterStorageProviders update_reason_region : ${update_reason_region} `);
+    INFO(`FilterStorageProviders update_reason_new : ${update_reason_new} `);
+
+    //Remove max 10 storage providers per cycle
+    if (storage_providers_delete.length > 10) {
+        WARNING(`FilterStorageProviders delete [${storage_providers_delete.length}] exceeds maximum of 10`);
+        storage_providers_delete = storage_providers_delete.splice(0, 10);
+    }
+
+    return { storage_providers_update: storage_providers_update, storage_providers_delete: storage_providers_delete };
+
 }
 
 const pause = (timeout) => new Promise(res => setTimeout(res, timeout * 1000));
@@ -272,12 +345,19 @@ const mainLoop = async _ => {
             await RefreshMinersList();
     
             let miners_data = await GetMinersPriceInfo();
-            let data = await CalculateAverages(miners_data.miners);
+            let data = await CalculateAverages(miners_data.miners, miners_data.total_power);
 
             await near.SetActivePerRegion(miners_data.active_per_region);
-            await near.UpdateStorageProviders(data.storage_providers);
-            console.log(data.price_per_region);
             await near.SetPricePerRegion(data.price_per_region);
+
+            let filter = await FilterStorageProviders(data.storage_providers);
+
+            if (filter.storage_providers_update?.length > 0) {
+                await near.UpdateStorageProviders(filter.storage_providers_update);
+            }
+            if (filter.storage_providers_delete?.length > 0) {
+                await near.DeleteStorageProviders(filter.storage_providers_delete);
+            }
 
             INFO(`Average price per region: ${JSON.stringify(data.price_per_region)}`);
             INFO(`Active per region: ${JSON.stringify(miners_data.active_per_region)}`);
