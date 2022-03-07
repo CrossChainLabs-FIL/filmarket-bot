@@ -1,16 +1,13 @@
 const config = require('./config');
 const { INFO, ERROR, WARNING } = require('./logs');
 const {
-    FormatSize,
-    TimeDeltaH,
-    FormatPriceFIL,
-    FormatPriceUSD,
     ToFIL,
     ToUSD,
     IsValidPriceFIL,
     ConvertToTBPricePerYear,
     ConvertBytesToGiB,
-    FormatValue
+    FormatFloatValue,
+    FormatIntValue
 } = require('./utils');
 const { Lotus } = require("./lotus");
 const { MinersClient } = require("./miners-client");
@@ -70,9 +67,9 @@ async function GetFILPrice() {
 async function GetMinersPriceInfo() {
     let result = [];
 
-    //const miners = Array.from(minersSet);
+    const miners = Array.from(minersSet);
 
-    const miners = [
+    /*const miners = [
        'f0152747',
         'f0673645',
        'f01033857',
@@ -91,7 +88,7 @@ async function GetMinersPriceInfo() {
         'f02665',
         'f0734051',
         'f0828066',
-    ];
+    ];*/
 
     INFO(`GetMinersPriceInfo for ${miners?.length} miners`);
     let asia = 0;
@@ -115,16 +112,16 @@ async function GetMinersPriceInfo() {
                         let region = ISOCodeToRegion(locationMap.get(miner));
 
                         switch (region) {
-                            case Regions['Other']:
+                            case 'Other':
                                 other++;
                                 break;
-                            case Regions['Europe']:
+                            case'Europe':
                                 europe++;
                                 break;
-                            case Regions['Asia']:
+                            case 'Asia':
                                 asia++;
                                 break;
-                            case Regions['North America']:
+                            case 'North America':
                                 north_america++
                                 break;
                             default:
@@ -138,7 +135,7 @@ async function GetMinersPriceInfo() {
                                 miner: miner,
                                 power: power,
                                 price: ConvertToTBPricePerYear(price),
-                                region: region,
+                                region: Regions[region],
                             }
                             
                             result.push(miner_data);
@@ -241,14 +238,23 @@ async function CalculateAverages(miners) {
         }
     }
 
+    let valueEurope = parseFloat(europePrice.dividedBy(europeCount));
+    let valueAsia = parseFloat(asiaPrice.dividedBy(asiaCount));
+    let valueNorthAmerica = parseFloat(northAmericaPrice.dividedBy(northAmericaCount));
+    let valueOther = parseFloat(otherPrice.dividedBy(otherCount));
+    let valueGlobal = parseFloat(globalPrice.dividedBy(globalCount));
+    let valueFILPrice = parseFloat(filPriceBN);
+    let valueTimestamp = parseInt(Math.floor(Date.now() / 1000));
+
     return {
-        FIL_price: parseFloat(filPriceBN),
-        global_price: parseFloat(globalPrice.dividedBy(globalCount)),
         price_per_region: {
-            europe: europePrice.dividedBy(europeCount).decimalPlaces(4).toFixed(),
-            asia: asiaPrice.dividedBy(asiaCount).decimalPlaces(4).toFixed(),
-            north_america: northAmericaPrice.dividedBy(northAmericaCount).decimalPlaces(4).toFixed(),
-            other: otherPrice.dividedBy(otherCount).decimalPlaces(4).toFixed(),
+            europe: FormatFloatValue(valueEurope),
+            asia: FormatFloatValue(valueAsia),
+            north_america: FormatFloatValue(valueNorthAmerica),
+            other: FormatFloatValue(valueOther),
+            global: FormatFloatValue(valueGlobal),
+            fil_price: FormatFloatValue(valueFILPrice),
+            timestamp: FormatIntValue(valueTimestamp),
         },
         storage_providers: result
     };
@@ -270,15 +276,11 @@ const mainLoop = async _ => {
 
             await near.SetActivePerRegion(miners_data.active_per_region);
             await near.UpdateStorageProviders(data.storage_providers);
-            await near.SetGlobalPrice(data.global_price);
-            await near.SetFILPrice(data.FIL_price);
+            console.log(data.price_per_region);
             await near.SetPricePerRegion(data.price_per_region);
 
-            INFO(`Average global price: ${JSON.stringify(data.price_per_region)}`);
             INFO(`Average price per region: ${JSON.stringify(data.price_per_region)}`);
             INFO(`Active per region: ${JSON.stringify(miners_data.active_per_region)}`);
-
-            stop = true;
 
             INFO(`Pause for 60 seconds`);
             await pause(60);

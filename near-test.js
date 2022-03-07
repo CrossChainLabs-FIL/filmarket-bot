@@ -1,3 +1,4 @@
+const { Regions } = require("./location");
 const { Near } = require('./near');
 
 (async () => {
@@ -12,26 +13,27 @@ const { Near } = require('./near');
     };
 
     let price_per_region = {
-        europe: '0.00013 USD',
-        asia: '0.0004 USD',
-        north_america: '0.0002 USD',
-        other: '0.00005 USD',
+        europe: 0.00013,
+        asia: 0.0004,
+        north_america: 0.0002,
+        other: 0.00005,
+        global: 0.00034,
+        fil_price: 64.245,
+        timestamp: 1,
     };
 
     let storage_providers = [
         {
-            id: "id3",
-            region: "europe",
-            power: "500000",
-            price: "0.001 USD",
-            price_fil: "20 nanoFIL"
+            id: "id1",
+            region: Regions['Europe'],
+            power: 64,
+            price: 0.001,
         },
         {
-            id: "id4",
-            region: "asia",
-            power: "600000",
-            price: "0.003 USD",
-            price_fil: "30 nanoFIL"
+            id: "id2",
+            region: Regions['Asia'],
+            power: 128,
+            price: 0.003
         },
     ];
 

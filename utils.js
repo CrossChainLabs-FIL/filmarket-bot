@@ -135,6 +135,22 @@ function ConvertToTBPrice(priceGiB) {
 
 }
 
+function FormatFloatValue(value) {
+    if (isNaN(value)) {
+        return 0.0;
+    }
+
+    return value;
+}
+
+function FormatIntValue(value) {
+    if (isNaN(value)) {
+        return 0.0;
+    }
+
+    return value;
+}
+
 module.exports = {
     FormatSize,
     TimeDeltaH,
@@ -146,5 +162,7 @@ module.exports = {
     ConvertToTBPrice,
     ConvertToTBPricePerYear,
     ConvertBytesToGiB,
-    FormatValue
+    FormatValue,
+    FormatFloatValue,
+    FormatIntValue
 };

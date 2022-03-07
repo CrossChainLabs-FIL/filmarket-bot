@@ -268,7 +268,7 @@ function ISOCodeToRegion(isoCode) {
         region = 'Other';
     }
 
-    return Regions[region];
+    return region;
 }
 
 module.exports = {

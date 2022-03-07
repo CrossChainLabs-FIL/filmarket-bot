@@ -8,8 +8,8 @@ const GAS = Big(3).times(10 ** 14).toFixed();
 const near_config = config.getConfig(process.env.NODE_ENV || 'development');
 
 const contractConfig = {
-    viewMethods: ['get_storage_providers', 'get_active_per_region', 'get_price_per_region', 'get_global_price', 'get_fil_price'],
-    changeMethods: ['new', 'update_storage_providers', 'set_active_per_region', 'set_price_per_region', 'set_global_price', 'set_fil_price']
+    viewMethods: ['get_storage_providers', 'get_active_per_region', 'get_price_per_region'],
+    changeMethods: ['new', 'update_storage_providers', 'set_active_per_region', 'set_price_per_region']
 }
 
 class Near {
@@ -76,28 +76,6 @@ class Near {
         }
     }
 
-    async SetGlobalPrice(global_price) {
-        if (global_price) {
-            await this.contract.set_global_price({
-                meta: 'Set global price',
-                callbackUrl: undefined,
-                args: { global_price: global_price },
-                amount: 0
-            });
-        }
-    }
-
-    async SetFILPrice(fil_price) {
-        if (fil_price) {
-            await this.contract.set_fil_price({
-                meta: 'Set global price',
-                callbackUrl: undefined,
-                args: { fil_price: fil_price },
-                amount: 0
-            });
-        }
-    }
-
     async GetActivePerRegion() {
         return await this.contract.get_active_per_region();
     }
@@ -108,14 +86,6 @@ class Near {
 
     async GetStorageProviders() {
         return await this.contract.get_storage_providers();
-    }
-
-    async GetGlobalPrice() {
-        return await this.contract.get_global_price();
-    }
-
-    async GetFILPrice() {
-        return await this.contract.get_fil_price();
     }
 }
 
