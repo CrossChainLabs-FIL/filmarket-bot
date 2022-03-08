@@ -38,6 +38,7 @@ module.exports = {
     coinmarketcap_apikey: process.env.COINMARKETCAP_APIKEY || '',
     update_slice: process.env.UPDATE_SLICE || 10,
     delete_slice: process.env.DELETE_SLICE || 2,
+    max_TiB_price_per_year: process.env.MAX_TiB_PRICE_PER_YEAR || 50.0, //FIL
   },
   near: {
     account_id:  process.env.ACCOUNT_ID || '',

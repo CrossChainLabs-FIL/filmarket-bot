@@ -4,7 +4,7 @@ const {
     ToFIL,
     ToUSD,
     IsValidPriceFIL,
-    ConvertToTBPricePerYear,
+    ConvertToTiBPricePerYear,
     ConvertBytesToGiB,
     FormatFloatValue,
     FormatIntValue
@@ -13,7 +13,9 @@ const { Lotus } = require("./lotus");
 const { MinersClient } = require("./miners-client");
 const { Regions, ISOCodeToRegion } = require("./location");
 const { Near } = require('./near');
-const CoinMarketCap = require('coinmarketcap-api')
+const CoinMarketCap = require('coinmarketcap-api');
+
+const sp_list = require('./sp-list.json');
 
 var BigNumber = require('bignumber.js');
 
@@ -67,7 +69,9 @@ async function GetFILPrice() {
 async function GetMinersPriceInfo() {
     let result = [];
 
-    const miners = Array.from(minersSet);
+    //const miners = Array.from(minersSet);
+    const miners = sp_list.miners;
+
 
     /*const miners = [
        'f0152747',
@@ -137,19 +141,22 @@ async function GetMinersPriceInfo() {
 
                         let ask = await lotus.ClientQueryAsk(peerId, miner);
                         let price = ask?.data?.result?.Price;
-                        if (price && IsValidPriceFIL(price)) {
+                        let priceTiBPPerYear = ToFIL(ConvertToTiBPricePerYear(price));
+
+                        if (price && IsValidPriceFIL(price) && (parseFloat(priceTiBPPerYear) < parseFloat(config.bot.max_TiB_price_per_year))) {
+
                             let miner_data = {
                                 miner: miner,
                                 power: power,
-                                price: ConvertToTBPricePerYear(price),
+                                price: priceTiBPPerYear,
                                 region: Regions[region],
                             }
                             
                             result.push(miner_data);
 
-                            INFO(`GetMinersPriceInfo[${miner}] power: ${power}, peerId: ${peerId}, price: ${price}`);
+                            INFO(`GetMinersPriceInfo[${miner}] power: ${power}, price: ${price} , priceTiBPPerYear: ${priceTiBPPerYear}`);
                         } else {
-                            INFO(`GetMinersPriceInfo[${miner}] power: ${power}, peerId: ${peerId} skip, no price info`);
+                            INFO(`GetMinersPriceInfo[${miner}] power: ${power}, price: ${price} , priceTiBPPerYear: ${priceTiBPPerYear}, skip, invalid price`);
                         }
                     }
 
@@ -204,7 +211,7 @@ async function CalculateAverages(miners, total_power) {
     }
 
     for (const m of miners) {
-        let priceUSD = ToUSD(ToFIL(m.price), filPrice);
+        let priceUSD = ToUSD(m.price, filPrice);
         let priceUSD_BN = new BigNumber(priceUSD);
 
         if (!priceUSD_BN.isNaN()) {
@@ -241,7 +248,7 @@ async function CalculateAverages(miners, total_power) {
                 id: m.miner,
                 region: m.region,
                 power: ConvertBytesToGiB(m.power),
-                price: parseFloat(ToFIL(m.price)),
+                price: parseFloat(m.price),
             });
         }
     }
@@ -342,6 +349,8 @@ const mainLoop = async _ => {
         await near.Init();
 
         while (!stop) {
+            const start = Date.now();
+
             await RefreshMinersList();
     
             let miners_data = await GetMinersPriceInfo();
@@ -362,8 +371,12 @@ const mainLoop = async _ => {
             INFO(`Average price per region: ${JSON.stringify(data.price_per_region)}`);
             INFO(`Active per region: ${JSON.stringify(miners_data.active_per_region)}`);
 
-            INFO(`Pause for 60 seconds`);
-            await pause(60);
+            const duration = Math.round((Date.now() - start) / 1000);
+
+            const sleep = (duration < 24 * 3600) ? (24 * 3600 - duration) : 30;
+
+            INFO(`Pause for ${sleep} seconds`);
+            await pause(sleep);
         }
         
     } catch (error) {

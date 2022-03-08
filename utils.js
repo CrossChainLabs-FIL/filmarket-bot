@@ -1,6 +1,7 @@
 var BigNumber = require('bignumber.js');
 
 const TB = 931.32257461548; //GiB
+const TiB = 1024; //GiB
 const EPOCHS = 1051200; //epochs per year
 
 function FormatSize(bytes, decimals = 2) {
@@ -113,26 +114,11 @@ function FormatPriceUSD(priceUSD) {
     return `${price.decimalPlaces(4).toFixed()} USD`;
 }
 
-function ConvertToTBPricePerYear(askPrice) {    
+function ConvertToTiBPricePerYear(askPrice) {    
     let epochPriceGiB = new BigNumber(askPrice);
     let yearPriceGiB = epochPriceGiB.multipliedBy(EPOCHS);
   
-    return `${yearPriceGiB.multipliedBy(TB).decimalPlaces(8).toFixed()}`;
-}
-
-function ConvertToTBPrice(priceGiB) {
-    let price = new BigNumber(priceGiB);
-
-    if (price.isNaN()) {
-        return 'N/A';
-    }
-
-    if (price.isZero()) {
-        return '0 USD';
-    }
-
-    return `${price.multipliedBy(TB).decimalPlaces(8).toFixed()}`;
-
+    return `${yearPriceGiB.multipliedBy(TiB).decimalPlaces(8).toFixed()}`;
 }
 
 function FormatFloatValue(value) {
@@ -159,8 +145,7 @@ module.exports = {
     ToFIL,
     ToUSD,
     IsValidPriceFIL,
-    ConvertToTBPrice,
-    ConvertToTBPricePerYear,
+    ConvertToTiBPricePerYear,
     ConvertBytesToGiB,
     FormatValue,
     FormatFloatValue,

@@ -4,6 +4,7 @@
     "description": "FilMarket Bot",
     "scripts": {
         "start": "env-cmd node index.js",
+        "update-sp-list": "env-cmd node update-sp-list.js",
         "test-miners": "env-cmd node miners-client-test.js",
         "test-near": "env-cmd node near-test.js"
     },
