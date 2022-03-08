@@ -69,30 +69,8 @@ async function GetFILPrice() {
 async function GetMinersPriceInfo() {
     let result = [];
 
-    //const miners = Array.from(minersSet);
-    const miners = sp_list.miners;
-
-
-    /*const miners = [
-       'f0152747',
-        'f0673645',
-       'f01033857',
-       'f0143858',
-        'f021255',
-        'f0700033',
-       'f042558',
-       'f023198',
-       'f0151366',
-        'f01016198',
-        'f0112087',
-        'f01072221',
-        'f0110567',
-        'f01035680',
-        'f01027268',
-        'f02665',
-        'f0734051',
-        'f0828066',
-    ];*/
+    const miners = Array.from(minersSet);
+    //const miners = sp_list.miners;
 
     INFO(`GetMinersPriceInfo for ${miners?.length} miners`);
     let asia = 0;
