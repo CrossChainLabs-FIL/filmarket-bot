@@ -283,13 +283,10 @@ async function FilterStorageProviders(storage_providers) {
             storage_providers_update.push(sp);
         } else {
             let spFromContract = spsFromContractMap.get(sp.id);
-            if (spFromContract.price != sp.price) {
+            if ((spFromContract.price != sp.price) && (spFromContract.timestamp - sp.timestamp > 7*24*3600)) {
                 update_reason_price++;
                 storage_providers_update.push(sp);
-            } else if (spFromContract.region != sp.region) {
-                update_reason_region++;
-                storage_providers_update.push(sp);
-            } else if (spFromContract.power != sp.power) {
+            } else if ((spFromContract.power != sp.power) && (spFromContract.timestamp - sp.timestamp > 7*24*3600)) {
                 update_reason_power++;
                 storage_providers_update.push(sp);
             }
@@ -342,9 +339,13 @@ const mainLoop = async _ => {
             if (filter.storage_providers_update?.length > 0) {
                 await near.UpdateStorageProviders(filter.storage_providers_update);
             }
+
+            // Disable
+            /*
             if (filter.storage_providers_delete?.length > 0) {
                 await near.DeleteStorageProviders(filter.storage_providers_delete);
             }
+            */
 
             INFO(`Average price per region: ${JSON.stringify(data.price_per_region)}`);
             INFO(`Active per region: ${JSON.stringify(miners_data.active_per_region)}`);
