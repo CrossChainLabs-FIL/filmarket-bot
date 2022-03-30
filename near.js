@@ -5,7 +5,7 @@ const Big = require('big.js');
 
 const GAS = Big(3).times(10 ** 14).toFixed();
 
-const near_config = config.getConfig(process.env.NODE_ENV || 'development');
+const near_config = config.getConfig('production');
 
 const contractConfig = {
     viewMethods: [
