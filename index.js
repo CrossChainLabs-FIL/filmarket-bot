@@ -283,10 +283,10 @@ async function FilterStorageProviders(storage_providers) {
             storage_providers_update.push(sp);
         } else {
             let spFromContract = spsFromContractMap.get(sp.id);
-            if ((spFromContract.price != sp.price) && (spFromContract.timestamp - sp.timestamp > 7*24*3600)) {
+            if ((spFromContract.price != sp.price) && (sp.timestamp - spFromContract.timestamp > 1*24*3600)) {
                 update_reason_price++;
                 storage_providers_update.push(sp);
-            } else if ((spFromContract.power != sp.power) && (spFromContract.timestamp - sp.timestamp > 7*24*3600)) {
+            } else if ((spFromContract.power != sp.power) && (sp.timestamp - spFromContract.timestamp > 7*24*3600)) {
                 update_reason_power++;
                 storage_providers_update.push(sp);
             }
