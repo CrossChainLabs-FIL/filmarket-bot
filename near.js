@@ -82,6 +82,22 @@ class Near {
         }
     }
 
+    async DeletePricePerRegion(timestamps) {
+        if (timestamps?.length) {
+                try {
+                    await this.contract.delete_price_per_region({
+                        meta: 'Delete price per region data points',
+                        callbackUrl: undefined,
+                        args: { timestamps: timestamps },
+                        amount: 0
+                    });
+                } catch (e) {
+
+                }
+            
+        }
+    }
+
     async SetActivePerRegion(active_per_region) {
         if (active_per_region) {
             await this.contract.set_active_per_region({
@@ -109,8 +125,8 @@ class Near {
         return await this.contract.get_active_per_region();
     }
 
-    async GetPricePerRegion() {
-        return await this.contract.get_price_per_region();
+    async GetPricePerRegionList() {
+        return await this.contract.get_price_per_region_list();
     }
 
     async GetStorageProviders() {
