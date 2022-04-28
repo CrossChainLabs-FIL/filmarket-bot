@@ -27,6 +27,8 @@ let locationMap = new Map();
 let minersSet = new Set();
 let near = new Near();
 
+const pause = (timeout) => new Promise(res => setTimeout(res, timeout * 1000));
+
 async function RefreshMinersList() {
     let minersClient_FG = new MinersClient(config.bot.miners_api_fg);
     let minersClient_RS = new MinersClient(config.bot.miners_api_rs);
@@ -141,6 +143,7 @@ async function GetMinersPriceInfo() {
                 } catch (e) {
                     if (e?.code != 'ECONNABORTED') {
                         INFO(`GetMinersPriceInfo[${miner}] -> ${e}`);
+                        await pause(60);
                     } else {
                         INFO(`GetMinersPriceInfo[${miner}] skip, no price info`);
                     }
@@ -314,8 +317,6 @@ async function FilterStorageProviders(storage_providers) {
     return { storage_providers_update: storage_providers_update, storage_providers_delete: storage_providers_delete };
 
 }
-
-const pause = (timeout) => new Promise(res => setTimeout(res, timeout * 1000));
 
 const mainLoop = async _ => {
     try {
