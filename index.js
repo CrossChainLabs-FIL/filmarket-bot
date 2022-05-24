@@ -318,6 +318,21 @@ async function FilterStorageProviders(storage_providers) {
 
 }
 
+async function SaveStorageProviders(storage_providers) {
+    INFO('[SaveStorageProviders] start');
+
+    try {
+        const fs = require('fs');
+        const jsonContent = JSON.stringify(storage_providers);
+
+        fs.writeFileSync(config.bot.sps, jsonContent, { encoding: 'utf8', flag: 'w' });
+    } catch (error) {
+        ERROR(`[SaveStorageProviders] error : ${error}`);
+    }
+
+    INFO('[SaveStorageProviders] done');
+}
+
 const mainLoop = async _ => {
     try {
         INFO('FilMarket Bot start');
@@ -331,6 +346,8 @@ const mainLoop = async _ => {
     
             let miners_data = await GetMinersPriceInfo();
             let data = await CalculateAverages(miners_data.miners, miners_data.total_power);
+
+            await SaveStorageProviders(data.storage_providers);
 
             await near.SetActivePerRegion(miners_data.active_per_region);
             await near.SetPricePerRegion(data.price_per_region);
