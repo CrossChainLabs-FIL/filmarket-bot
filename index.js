@@ -352,11 +352,14 @@ const mainLoop = async _ => {
             await near.SetActivePerRegion(miners_data.active_per_region);
             await near.SetPricePerRegion(data.price_per_region);
 
+            // Disable
+            /*
             let filter = await FilterStorageProviders(data.storage_providers);
 
             if (filter.storage_providers_update?.length > 0) {
                 await near.UpdateStorageProviders(filter.storage_providers_update);
             }
+            */
 
             // Disable
             /*
