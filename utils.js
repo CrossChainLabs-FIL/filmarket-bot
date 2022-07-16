@@ -92,6 +92,10 @@ function IsValidPriceFIL(attoFil) {
     if (atto.isNaN()) {
       return false;
     }
+
+    if (atto.isLessThan(BigNumber(0))) {
+        valid = false;
+    }
   
     if (atto.isGreaterThanOrEqualTo(BigNumber(10).pow(12))) {
         valid = false;
