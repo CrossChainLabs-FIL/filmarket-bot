@@ -104,3 +104,6 @@ dist
 .tern-port
 
 deploy.sh
+
+sp-list-hyperspace.json
+sps.json

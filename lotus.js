@@ -57,6 +57,10 @@ class Lotus {
     NetFindPeer(peerId) {
         return this.LotusAPI("NetFindPeer", [peerId]);
     }
+
+    StateListMiners() {
+        return this.LotusAPI("StateListMiners", [null]);
+    }
 }
 
 module.exports = {

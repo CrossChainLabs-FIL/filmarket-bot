@@ -16,8 +16,10 @@ const { Near } = require('./near');
 const CoinMarketCap = require('coinmarketcap-api');
 
 const sp_list = require('./sp-list.json');
+const hyperspace_sp_list = require('./sp-list-hyperspace.json');
 
 var BigNumber = require('bignumber.js');
+const { getCity } = require('./maxmind-client');
 
 const coinMarketCap = new CoinMarketCap(config.bot.coinmarketcap_apikey);
 
@@ -30,23 +32,74 @@ let near = new Near();
 const pause = (timeout) => new Promise(res => setTimeout(res, timeout * 1000));
 
 async function RefreshMinersList() {
-    let minersClient_FG = new MinersClient(config.bot.miners_api_fg);
-    let minersClient_RS = new MinersClient(config.bot.miners_api_rs);
+    if (config.bot.state_list_miners == 0) {
+        let minersClient_FG = new MinersClient(config.bot.miners_api_fg);
+        const miners_fg = await minersClient_FG.GetMiners();
 
-    const miners_fg = await minersClient_FG.GetMiners();
-
-    for (const m_fg of miners_fg) {
-        minersSet.add(m_fg.miner);
-    }
-
-    const miners_rs = await minersClient_RS.GetMiners();
-
-    for (const m_rs of miners_rs) {
-        if (m_rs.isoCode) {
-            locationMap.set(m_rs.address, m_rs.isoCode);
+        for (const m_fg of miners_fg) {
+            minersSet.add(m_fg.miner);
         }
-        
-        minersSet.add(m_rs.address);
+    } else {
+        let miners = (await lotus.StateListMiners())?.data?.result;
+
+        if (miners?.length > 0) {
+            for (const m of miners) {
+                minersSet.add(m);
+            }
+        }
+    }
+}
+
+async function GetLocation(miner_info) {
+    if (miner_info.addrs) {
+        let isoCode = undefined;
+        let city = undefined;
+
+        for (let rawAddr of miner_info.addrs) {
+            let addr = rawAddr.substr(5);
+            let pos = addr.indexOf('/');
+
+            const geoLocationResponse = await getCity(addr.substr(0, pos)).catch(() => undefined);
+            isoCode = geoLocationResponse?.country?.isoCode;
+            city = geoLocationResponse?.city?.names?.en;
+
+            if (isoCode) {
+                break;
+            }
+        };
+
+        if (!isoCode) {
+            ERROR(`GetLocation[${JSON.stringify(miner_info)}] isoCode is not defined`);
+            return undefined;
+        }
+
+        INFO(`GetLocation[${miner_info.miner}] -> ${isoCode},${city}`);
+
+        return {
+            isoCode: isoCode,
+            city: city,
+        };
+    }
+}
+
+async function GetMinerLocation(miner, peerId) {
+    let location = locationMap.get(miner);
+
+    if (location) {
+        INFO(`GetLocation[miner] -> ${location.isoCode},${location.city} from cache`);
+        return location;
+    } else {
+        const response = await lotus.NetFindPeer(peerId);
+        const addrs = response?.data?.result?.Addrs;
+
+        if (addrs) {
+            let location = await GetLocation({ miner, addrs });
+            locationMap.set(miner, location);
+
+            return location;
+        } else {
+            return undefined
+        }
     }
 }
 
@@ -70,9 +123,11 @@ async function GetFILPrice() {
 
 async function GetMinersPriceInfo() {
     let result = [];
+    let miner_info_result = [];
 
     const miners = Array.from(minersSet);
     //const miners = sp_list.miners;
+    //const miners = hyperspace_sp_list.miners;
 
     INFO(`GetMinersPriceInfo for ${miners?.length} miners`);
     let asia = 0;
@@ -80,6 +135,7 @@ async function GetMinersPriceInfo() {
     let other = 0;
     let europe = 0;
     let total_power = 0;
+    let network_power;
 
     if (miners?.length) {
         var minersSlice = miners;
@@ -90,6 +146,7 @@ async function GetMinersPriceInfo() {
                     let power_response = (await lotus.StateMinerPower(miner))?.data?.result;
 
                     if (!total_power) {
+                        network_power = power_response?.TotalPower;
                         let total_powerBN = new BigNumber(power_response?.TotalPower?.QualityAdjPower);
                         total_power = parseInt(total_powerBN.dividedBy(Math.pow(1024, 4)));
                     }
@@ -100,7 +157,8 @@ async function GetMinersPriceInfo() {
                     if (isNaN(powerValue) ||  powerValue <= 0 || !peerId) {
                         INFO(`GetMinersPriceInfo[${miner}] power: ${power}, peerId: ${peerId} skip, invalid power or peerId`);
                     } else {
-                        let region = ISOCodeToRegion(locationMap.get(miner));
+                        let location = await GetMinerLocation(miner, peerId);
+                        let region = ISOCodeToRegion(location?.isoCode);
 
                         switch (region) {
                             case 'Other':
@@ -121,6 +179,25 @@ async function GetMinersPriceInfo() {
 
                         let ask = await lotus.ClientQueryAsk(peerId, miner);
                         let price = ask?.data?.result?.Price;
+
+                        let miner_info = {
+                            Miner: miner,
+                            PeerId: peerId,
+                            MinerPower: power_response?.MinerPower,
+                            Location: {
+                                Region: region,
+                                ISOCode: location?.isoCode, 
+                                City: location?.city
+                            },
+                            Price: ask?.data?.result?.Price,
+                            VerifiedPrice: ask?.data?.result?.VerifiedPrice,
+                            MinPieceSize: ask?.data?.result?.MinPieceSize,
+                            MaxPieceSize: ask?.data?.result?.MaxPieceSize,
+                            Timestamp: ask?.data?.result?.Timestamp,
+                            Expiry: ask?.data?.result?.Expiry,
+                            SeqNo: ask?.data?.result?.SeqNo,
+                        }
+
                         let priceTiBPPerYear = ToFIL(ConvertToTiBPricePerYear(price));
 
                         if (price && IsValidPriceFIL(price) && (parseFloat(priceTiBPPerYear) < parseFloat(config.bot.max_TiB_price_per_year))) {
@@ -133,6 +210,7 @@ async function GetMinersPriceInfo() {
                             }
                             
                             result.push(miner_data);
+                            miner_info_result.push(miner_info);
 
                             INFO(`GetMinersPriceInfo[${miner}] power: ${power}, price: ${price} , priceTiBPPerYear: ${priceTiBPPerYear}`);
                         } else {
@@ -165,7 +243,9 @@ async function GetMinersPriceInfo() {
             other: other,
         },
         total_power: total_power,
-        miners: result
+        miners: result,
+        network_power: network_power,
+        miners_info: miner_info_result
     };
 }
 
@@ -318,19 +398,33 @@ async function FilterStorageProviders(storage_providers) {
 
 }
 
-async function SaveStorageProviders(storage_providers) {
-    INFO('[SaveStorageProviders] start');
-
+async function SaveToFile(data, filename) {
     try {
         const fs = require('fs');
-        const jsonContent = JSON.stringify(storage_providers);
+        const jsonContent = JSON.stringify(data);
 
-        fs.writeFileSync(config.bot.sps, jsonContent, { encoding: 'utf8', flag: 'w' });
+        fs.writeFileSync(filename, jsonContent, { encoding: 'utf8', flag: 'w' });
     } catch (error) {
-        ERROR(`[SaveStorageProviders] error : ${error}`);
+        ERROR(`[SaveToFile] error : ${error}`);
     }
+}
 
-    INFO('[SaveStorageProviders] done');
+function LoadLocationData() {
+    const fs = require('fs');
+
+    try {
+        let raw_data = fs.readFileSync(config.bot.sps_location);
+        let location_data = JSON.parse(raw_data);
+
+        if (location_data?.length > 0) {
+            INFO(`[LoadLocationData] load ${location_data?.length} items`);
+            for (const ld of location_data) {
+                locationMap.set(ld[0], ld[1]);
+            }
+        }
+    } catch (error) {
+        ERROR(`[LoadLocationData] error : ${error}`);
+    }
 }
 
 const mainLoop = async _ => {
@@ -338,6 +432,8 @@ const mainLoop = async _ => {
         INFO('FilMarket Bot start');
         INFO('NEAR Init');
         await near.Init();
+
+        LoadLocationData();
 
         while (!stop) {
             const start = Date.now();
@@ -347,7 +443,11 @@ const mainLoop = async _ => {
             let miners_data = await GetMinersPriceInfo();
             let data = await CalculateAverages(miners_data.miners, miners_data.total_power);
 
-            await SaveStorageProviders(data.storage_providers);
+            console.log(miners_data.miners_info);
+
+            await SaveToFile(data.storage_providers, config.bot.sps);
+            await SaveToFile(Array.from(locationMap), config.bot.sps_location);
+            await SaveToFile({network: miners_data.network_power, storage_providers: miners_data.miners_info}, config.bot.sps_info);
 
             await near.SetActivePerRegion(miners_data.active_per_region);
             await near.SetPricePerRegion(data.price_per_region);
