@@ -14,11 +14,10 @@ const app = express();
 async function RefreshStorageProvidersData() {
     try {
         fs.readFile(config.bot.sps_info, (err, raw_data) => {
-            let data = JSON.parse(raw_data);
-
             if (err) {
                 ERROR(`[RefreshStorageProvidersData] error : ${err}`);
-            } else if (data) {
+            } else if (raw_data) {
+                let data = JSON.parse(raw_data);
                 sps_data = data;
                 INFO(`[RefreshStorageProvidersData] successful`);
             }
