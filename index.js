@@ -16,7 +16,7 @@ const { Near } = require('./near');
 const CoinMarketCap = require('coinmarketcap-api');
 
 const sp_list = require('./sp-list.json');
-const hyperspace_sp_list = require('./sp-list-hyperspace.json');
+//const hyperspace_sp_list = require('./sp-list-hyperspace.json');
 
 var BigNumber = require('bignumber.js');
 const { getCity } = require('./maxmind-client');
