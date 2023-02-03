@@ -1,0 +1,14 @@
+{
+    "apps": [
+        {
+            "name": "filmarket-bot",
+            "script": "npm",
+            "args" : "run start"
+        },
+        {
+            "name": "filmarket-api",
+            "script": "npm",
+            "args" : "run api"
+        }
+    ]
+}
