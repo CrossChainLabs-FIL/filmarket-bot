@@ -443,14 +443,14 @@ const mainLoop = async _ => {
             let miners_data = await GetMinersPriceInfo();
             let data = await CalculateAverages(miners_data.miners, miners_data.total_power);
 
-            console.log(miners_data.miners_info);
+            if (data?.storage_providers?.length > 0) {
+                await SaveToFile(data.storage_providers, config.bot.sps);
+                await SaveToFile(Array.from(locationMap), config.bot.sps_location);
+                await SaveToFile({ network: miners_data.network_power, storage_providers: miners_data.miners_info }, config.bot.sps_info);
 
-            await SaveToFile(data.storage_providers, config.bot.sps);
-            await SaveToFile(Array.from(locationMap), config.bot.sps_location);
-            await SaveToFile({network: miners_data.network_power, storage_providers: miners_data.miners_info}, config.bot.sps_info);
-
-            await near.SetActivePerRegion(miners_data.active_per_region);
-            await near.SetPricePerRegion(data.price_per_region);
+                await near.SetActivePerRegion(miners_data.active_per_region);
+                await near.SetPricePerRegion(data.price_per_region);
+            }
 
             // Disable
             /*
