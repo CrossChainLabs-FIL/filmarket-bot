@@ -136,6 +136,7 @@ async function GetMinersPriceInfo() {
     let europe = 0;
     let total_power = 0;
     let network_power;
+    let current_progress = 0;
 
     if (miners?.length) {
         var minersSlice = miners;
@@ -212,9 +213,10 @@ async function GetMinersPriceInfo() {
                             result.push(miner_data);
                             miner_info_result.push(miner_info);
 
-                            INFO(`GetMinersPriceInfo[${miner}] power: ${power}, price: ${price} , priceTiBPPerYear: ${priceTiBPPerYear}`);
+                            current_progress++;
+                            INFO(`GetMinersPriceInfo[${miner}] (${current_progress} / ${miners?.length}) power: ${power}, price: ${price} , priceTiBPPerYear: ${priceTiBPPerYear}`);
                         } else {
-                            INFO(`GetMinersPriceInfo[${miner}] power: ${power}, price: ${price} , priceTiBPPerYear: ${priceTiBPPerYear}, skip, invalid price`);
+                            INFO(`GetMinersPriceInfo[${miner}] (${current_progress} / ${miners?.length}) power: ${power}, price: ${price} , priceTiBPPerYear: ${priceTiBPPerYear}, skip, invalid price`);
                         }
                     }
 
