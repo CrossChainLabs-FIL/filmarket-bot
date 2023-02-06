@@ -143,6 +143,7 @@ async function GetMinersPriceInfo() {
         while (minersSlice.length) {
             await Promise.all(minersSlice.splice(0, config.bot.lotus_api_rps).map(async (miner) => {
                 try {
+                    current_progress++;
                     let peerId = (await lotus.StateMinerInfo(miner))?.data?.result?.PeerId;
                     let power_response = (await lotus.StateMinerPower(miner))?.data?.result;
 
@@ -154,8 +155,6 @@ async function GetMinersPriceInfo() {
 
                     let power = power_response?.MinerPower?.QualityAdjPower;
                     let powerValue = parseInt(power);
-
-                    current_progress++;
 
                     if (isNaN(powerValue) ||  powerValue <= 0 || !peerId) {
                         INFO(`GetMinersPriceInfo[${miner}] (${current_progress} / ${miners?.length}) power: ${power}, peerId: ${peerId} skip, invalid power or peerId`);
@@ -222,7 +221,6 @@ async function GetMinersPriceInfo() {
                     }
 
                 } catch (e) {
-                    current_progress++;
                     if (e?.code != 'ECONNABORTED') {
                         INFO(`GetMinersPriceInfo[${miner}] (${current_progress} / ${miners?.length}) -> ${e}`);
                         await pause(60);
