@@ -222,11 +222,12 @@ async function GetMinersPriceInfo() {
                     }
 
                 } catch (e) {
+                    current_progress++;
                     if (e?.code != 'ECONNABORTED') {
-                        INFO(`GetMinersPriceInfo[${miner}] -> ${e}`);
+                        INFO(`GetMinersPriceInfo[${miner}] (${current_progress} / ${miners?.length}) -> ${e}`);
                         await pause(60);
                     } else {
-                        INFO(`GetMinersPriceInfo[${miner}] skip, no price info`);
+                        INFO(`GetMinersPriceInfo[${miner}] (${current_progress} / ${miners?.length}) skip, no price info`);
                     }
                 }
             }));
