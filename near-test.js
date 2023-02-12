@@ -11,7 +11,7 @@ const { Near } = require('./near');
   // NOTE : don't delete the latest datapoint -> affects top cards
 
   const timestamps = [
-    1675463649, 1675465339
+    1675610083
   ];
 
   //console.log('DeletePricePerRegion');
